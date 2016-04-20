@@ -29,3 +29,12 @@ hold <- make.SpatialVx(x, y, field.type="contrived", units="none",
 par( mfrow=c(1,2))
 image.plot(x)
 image.plot(y)
+
+m=matrix(1:12,3,4)
+m
+as.vector(m)
+as.vector(t(m))
+
+d <- data.frame()
+for (i in 1:20) {d <- rbind(d,c(i+i, i*i, i/1))}
+d
