@@ -21,6 +21,14 @@ class Radar:
             self.get_box(self.from_hdf5())
         print('new instance of Radar object for: {c} {yyyy}-{mm:02d}'.format(c=self.city, yyyy=self.t.year, mm=self.t.month))
 
+    def set_t(self, t):
+        t = pd.Timestamp(t)
+        if t in self.time:
+            self.t = t
+        else:
+            print 'choose a time in this range {s}:{e}'.format(s=self.time[0], e=self.time[-1])
+        return self.t
+     
     def from_csv(self):
         path = self.path+'{c}/BigBOX/'.format(c=self.city)
         def dateparse(Y, m, d, H, M):
