@@ -4,26 +4,29 @@ import sys
 
 class Radar:
 
-    def __init__(self, city, t, how='csv', make_rate=False, path='../../data/', store='store.h5',
-                 fname=None, llname='Charlotte_box_latlon_big.csv'):
+    def __init__(self, city, t, how='csv', make_rate=False, 
+                 csv_path='../../data/{c}/BOX/', store='{c}/store.h5',
+                 fname=None, llname='{c}/box_latlon.csv'):
         self.city = city.upper()
         self.t = pd.Timestamp(t)
-        self.path = path
-        self.llname = llname
+        self.csv_path = csv_path.format(c=self.city)
+        self.llname = llname.format(c=self.city)
         self.is_rate = False
         if how == 'csv':
             if fname is None:
-                self.fname = 'Charlotte_box_radar_{yyyy}_{mm:02d}.csv'.format(yyyy=self.t.year, mm=self.t.month)
+                self.fname = '{c}_box_radar_{yyyy}_{mm:02d}.csv'.format(c=self.city, yyyy=self.t.year, mm=self.t.month)
             else:
                 self.fname = fname.format(c=self.city, yyyy=self.t.year, mm=self.t.month, dd=self.t.day)
             self.get_box(self.from_csv())
 
         if how == 'hdf5':
-            self.store = store
+            self.store = store.format(c=self.city)
             if fname is None:
-                self.fname = '{c}_{yyyy}_{mm:02d}'.format(c=self.city, yyyy=self.t.year, mm=self.t.month)
-            else:
-                self.fname = fname.format(c=self.city, yyyy=self.t.year, mm=self.t.month, dd=self.t.day)
+                if 'TOP50' in self.store:
+                    fname = 'storm_{yyyy}_{mm:02d}_{dd:02d}'
+                else:
+                    fname = '{c}_{yyyy}_{mm:02d}'
+            self.fname = fname.format(c=self.city, yyyy=self.t.year, mm=self.t.month, dd=self.t.day)
             self.get_box(self.from_hdf5())
         if make_rate:
             self.to_rate(make_rate)
@@ -46,7 +49,7 @@ class Radar:
         return self.t
      
     def from_csv(self):
-        path = self.path
+        path = self.csv_path
         def dateparse(Y, m, d, H, M):
             d = pd.datetime(int(Y), int(m), int(d), int(H), int(M))
             return d
@@ -65,8 +68,7 @@ class Radar:
         return df
 
     def get_box(self, df):
-        path = self.path
-        ll = pd.read_csv(path+self.llname, index_col=0, header=None, names=['lat','lon'])
+        ll = pd.read_csv(self.llname, index_col=0, header=None, names=['lat','lon'])
 
         self.box = df.values.reshape(df.shape[0],140,140)
         self.lon = ll.lon.reshape(140,140)
