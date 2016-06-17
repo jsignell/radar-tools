@@ -143,6 +143,27 @@ class Radar:
                         df0.set_value(p.major_axis[ifeat], p.minor_axis[ichar], np.nan)
         return(p)
 
+    def add_extra_buffer(self, p, extra):
+        from geopy.distance import vincenty
+
+        edges = zip(self.lat[0, :], self.lon[0, :])
+        edges.extend(zip(self.lat[:, -1], self.lon[:, -1]))
+        edges.extend(zip(np.flipud(self.lat[-1, :]), np.flipud(self.lon[-1, :])))
+        edges.extend(zip(np.flipud(self.lat[:, 0]), np.flipud(self.lon[:, 0])))
+        
+        for it in range(p.shape[0]):
+            for ifeat in range(p.shape[1]):
+                if np.isnan(p[it, ifeat, 'centroidY']):
+                    continue
+                center = p[it, ifeat, ['centroidY', 'centroidX']].values
+                dist = min([vincenty(center, edge).kilometers for edge in edges])
+                r = (p[it, ifeat, ['area']].values/np.pi)**.5
+                if r+extra>dist:
+                    df0 = p[it,:,:]
+                    for ichar in range(21):
+                        df0.set_value(p.major_axis[ifeat], p.minor_axis[ichar], np.nan)
+        return(p)
+
     def get_features(self, d={}, thresh=10, min_size=20, sigma=3, const=20, return_dict=True, buffer=False):
         '''
         Use r package SpatialVx to identify features. 
