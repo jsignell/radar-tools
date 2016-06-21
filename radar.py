@@ -74,7 +74,16 @@ class Radar:
         self.lon = ll.lon.reshape(140,140)
         self.lat = ll.lat.reshape(140,140)
         self.time = df.index
-    
+        try:
+            from pointprocess import DataBox
+            self.db = DataBox(self.time, self.lat, self.lon, self.box)
+        except:
+            pass
+
+    def get_features(self, d={}, thresh=10, min_size=20, sigma=3, const=20, return_dict=True, buffer=False):
+        return(self.db.get_features(d=d, thresh=thresh, min_size=min_size, sigma=sigma, 
+                                    const=const, return_dict=return_dict, buffer=buffer)
+'''    
     def centralized_difference(self, t_start=None, t_end=None, radius=15, buffer=20, save=False, **kwargs):
         import matplotlib.pyplot as plt
         import cartopy.crs as ccrs
@@ -121,29 +130,8 @@ class Radar:
         ax.set_extent([self.lon[iy, ix-radius], self.lon[iy, ix+radius], self.lat[iy-radius, ix], self.lat[iy+radius, ix]])
         ax.scatter(self.lon[iy, ix], self.lat[iy, ix], edgecolor='white', facecolor='None')
         return(scat, ax, kwargs['vmax'])
-    
-    def add_buffer(self, p):
-        from geopy.distance import vincenty
 
-        edges = zip(self.lat[0, :], self.lon[0, :])
-        edges.extend(zip(self.lat[:, -1], self.lon[:, -1]))
-        edges.extend(zip(np.flipud(self.lat[-1, :]), np.flipud(self.lon[-1, :])))
-        edges.extend(zip(np.flipud(self.lat[:, 0]), np.flipud(self.lon[:, 0])))
-        
-        for it in range(p.shape[0]):
-            for ifeat in range(p.shape[1]):
-                if np.isnan(p[it, ifeat, 'centroidY']):
-                    continue
-                center = p[it, ifeat, ['centroidY', 'centroidX']].values
-                dist = min([vincenty(center, edge).kilometers for edge in edges])
-                r = (p[it, ifeat, ['area']].values/np.pi)**.5
-                if r>dist:
-                    df0 = p[it,:,:]
-                    for ichar in range(21):
-                        df0.set_value(p.major_axis[ifeat], p.minor_axis[ichar], np.nan)
-        return(p)
-
-    def add_extra_buffer(self, p, extra):
+    def add_buffer(self, p, extra=0):
         from geopy.distance import vincenty
 
         edges = zip(self.lat[0, :], self.lon[0, :])
@@ -165,13 +153,7 @@ class Radar:
         return(p)
 
     def get_features(self, d={}, thresh=10, min_size=20, sigma=3, const=20, return_dict=True, buffer=False):
-        '''
-        Use r package SpatialVx to identify features. 
-        
-        Parameters
-        ----------
-       
-        '''
+
         from rpy2 import robjects 
         from rpy2.robjects.packages import importr
         from rpy2.robjects import pandas2ri
@@ -224,3 +206,4 @@ class Radar:
         kernel = st.gaussian_kde(values)
         f = np.reshape(kernel(positions).T, xx.shape)
         return(xx,yy,f)    
+'''
