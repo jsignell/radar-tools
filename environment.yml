@@ -13,6 +13,7 @@ dependencies:
 - numpy
 - cython
 - wget
+- lxml
 - pip:
   - skewt
   - git+git://github.com/CSU-Radarmet/CSU_RadarTools.git
