@@ -139,14 +139,17 @@ def interpolate_radially(radar, field, start_gate, end_gate, interpolate_max=10)
         return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
 
     def func(a, interpolate_max):
-        # for each ring in the sweep we will try to interpolate
-        x=np.arange(a.shape[0])
-        y=a.data
-        ma0=a.mask
-        ma1 = np.sum(rolling_window(ma0, interpolate_max), axis=1)<interpolate_max
-        ma1 = np.concatenate([ma1, np.array([ma1[-1]]*(interpolate_max-1))])
-        y[ma0 & ma1] = np.interp(x[ma0 & ma1], x[~ma0], y[~ma0], left=0, right=0)
-        a.mask = ma0 & ~ma1
+        try:
+            # for each ring in the sweep we will try to interpolate
+            x=np.arange(a.shape[0])
+            y=a.data
+            ma0 = a.mask
+            ma1 = np.sum(rolling_window(ma0, interpolate_max), axis=1)<interpolate_max
+            ma1 = np.concatenate([ma1, np.array([ma1[-1]]*(interpolate_max-1))])
+            y[ma0 & ma1] = np.interp(x[ma0 & ma1], x[~ma0], y[~ma0], left=0, right=0)
+            a.mask = ma0 & ~ma1
+        except:
+            pass
 
     for n in range(len(sweep_starts)-1):
         foo = [func(rain[sweep_starts[n]:sweep_starts[n+1],i], interpolate_max) for
