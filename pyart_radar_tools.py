@@ -1,5 +1,77 @@
+import os
+import re
 import numpy as np
 import pandas as pd
+import wget
+from lxml.html import parse
+
+def data_download(ID, t_start, t_end, cache='./tmp/'):
+    t_start = pd.Timestamp(t_start)
+    t_end = pd.Timestamp(t_end)
+
+    catalog_url = get_catalog_url(ID, t_start)
+    data_urls, times, filenames = get_AWS_urls(catalog_url, t_start, t_end)
+
+    if len(filenames) > 100:
+        do = str(raw_input('Download {n} files? (y|n) '.format(n=len(filenames))))
+        if do[0].lower() != 'y':
+            return
+    paths = []
+    for data_url, filename in zip(data_urls, filenames):
+        paths.append(get_datafile(data_url, filename, cache))
+    return paths
+
+def get_catalog_url(ID, t_start):
+    Y = '{Y:04d}'.format(Y=t_start.year)
+    M = '{M:02d}'.format(M=t_start.month)
+    D = '{D:02d}'.format(D=t_start.day)
+
+    url = 'http://www.ncdc.noaa.gov/nexradinv/bdp-download.jsp?id={ID}&yyyy={Y}&mm={M}&dd={D}&product=AAL2'.format(
+           ID=ID, Y=Y, M=M, D=D)
+    return url
+
+def get_AWS_urls(catalog_url, t_start, t_end, **kwargs):
+    page = parse(catalog_url)
+    pattern = re.compile("[A-Z]{4}([0-9]{8})_([0-9]{6})*")
+
+    data_urls = kwargs.get('data_urls', [])
+    filenames = kwargs.get('filenames', [])
+    times = kwargs.get('times', [])
+
+    for el in page.xpath("//div[@class='bdpLink']"):
+        data_url = el.find("a").get("href")
+        filename = data_url.split('/')[-1]
+        if not pattern.search(filename):
+            continue
+        time = pd.Timestamp(filename[4:19].replace('_', ' '))
+        data_urls.append(data_url)
+        filenames.append(filename)
+        times.append(time)
+    times = pd.DatetimeIndex(times)
+    
+    t0 = times.asof(pd.Timestamp(t_start))
+    tn = times.asof(pd.Timestamp(t_end))
+     
+    data_urls = data_urls[times.get_loc(t0): times.get_loc(tn)]
+    filenames = filenames[times.get_loc(t0): times.get_loc(tn)]
+    times = times[times.get_loc(t0): times.get_loc(tn)]
+
+    return data_urls, times, filenames
+
+def get_datafile(data_url, filename, cache='./tmp/'):
+    if not os.path.isdir(cache):
+        os.mkdir(cache)
+    path = os.path.join(cache, filename)
+
+    if os.path.isfile(path):
+        print('using cached file ...')
+        print(path)
+
+    else:
+        print('downloading file ...')
+        print(wget.download(data_url, out=path))
+
+    return path
 
 def get_z_from_radar(radar):
     """Input radar object, return z from radar (m, 2D)"""
@@ -39,6 +111,17 @@ def interpolate_sounding_to_radar(sounding, radar):
     rad_z1d = radar_z.ravel()
     rad_T1d = np.interp(rad_z1d, snd_z, snd_T)
     return np.reshape(rad_T1d, shape), radar_z
+
+
+def find_x_y_displacement(radar, longitude, latitude):
+    """ Return the x and y displacement (in meters) from a radar location. """
+    import pyproj
+
+    # longitude and latitude in degrees
+    lat_0 = radar.latitude['data'][0]
+    lon_0 = radar.longitude['data'][0]
+    proj = pyproj.Proj(proj='aeqd', lon_0=lon_0, lat_0=lat_0)
+    return proj(longitude, latitude)
 
 def extract_low_sweeps(radar, max_elevation_angle=0.6):
     """Extract lowest sweeps from a radar"""
@@ -290,12 +373,23 @@ def calculate_rain_nexrad(radar,
     radar = add_field_to_radar_object(r_z, radar, **rain_field_dict)
     return radar
 
-def find_x_y_displacement(radar, longitude, latitude):
-    """ Return the x and y displacement (in meters) from a radar location. """
-    import pyproj
+def calculate_dsd_parameters(radar):
+    from csu_radartools import csu_dsd
+    
+    if 'kdp' not in radar.fields.keys():
+        radar = get_kdp(radar)
+    kd = extract_unmasked_data(radar, 'kdp')
+    dz = extract_unmasked_data(radar, 'reflectivity')
+    dr = extract_unmasked_data(radar, 'differential_reflectivity')
 
-    # longitude and latitude in degrees
-    lat_0 = radar.latitude['data'][0]
-    lon_0 = radar.longitude['data'][0]
-    proj = pyproj.Proj(proj='aeqd', lon_0=lon_0, lat_0=lat_0)
-    return proj(longitude, latitude)
+    d0, Nw, mu = csu_dsd.calc_dsd(dz=dz, zdr=dr, kdp=kd, band='S')
+    radar = add_field_to_radar_object(d0, radar, field_name='D0', units='mm', 
+                                      long_name='Median Volume Diameter',
+                                      standard_name='Median Volume Diameter')
+    logNw = np.log10(Nw)
+    radar = add_field_to_radar_object(logNw, radar, field_name='NW', units='', 
+                                      long_name='Normalized Intercept Parameter',
+                                      standard_name='Normalized Intercept Parameter')
+    radar = add_field_to_radar_object(mu, radar, field_name='MU', units='', long_name='Mu', 
+                                      standard_name='Mu')
+    return radar
