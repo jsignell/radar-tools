@@ -393,3 +393,42 @@ def calculate_dsd_parameters(radar):
     radar = add_field_to_radar_object(mu, radar, field_name='MU', units='', long_name='Mu', 
                                       standard_name='Mu')
     return radar
+
+def retrieve_points(radar, sweep, fields, loc_dict):
+    '''
+    loc_dict: dict, with keys representing location names and each location
+              having keys: 'y_disp' and 'x_disp'
+    '''
+    gate_x, gate_y, gate_z = radar.get_gate_x_y_z(sweep)
+
+    b = []
+    for k, v in loc_dict.items():
+        distances = np.sqrt((gate_x-v['x_disp'])**2. + 
+                            (gate_y-v['y_disp'])**2.)
+        ray, gate = np.unravel_index(distances.argmin(), distances.shape)
+        
+        # increment ray index by start of ray index for the sweep
+        ray += radar.sweep_start_ray_index['data'][sweep]
+        a = np.array([radar.gate_latitude['data'][ray, gate],
+                      radar.gate_longitude['data'][ray, gate],
+                      radar.gate_altitude['data'][ray, gate]])
+        a = np.concatenate([a, [radar.fields[field]['data'][ray, gate] for field in fields]])
+        b.append(a)
+    return np.stack(b, axis=1)
+
+
+def retrieve_point(radar, sweep, fields, x_disp, y_disp):
+    gate_x, gate_y, gate_z = radar.get_gate_x_y_z(sweep)
+
+    distances = np.sqrt((gate_x-x_disp)**2. + 
+                        (gate_y-y_disp)**2.)
+    ray, gate = np.unravel_index(distances.argmin(), distances.shape)
+
+    # increment ray index by start of ray index for the sweep
+    ray += radar.sweep_start_ray_index['data'][sweep]
+    a = np.array([radar.gate_latitude['data'][ray, gate],
+                  radar.gate_longitude['data'][ray, gate],
+                  radar.gate_altitude['data'][ray, gate]])
+    b = [radar.fields[field]['data'][ray, gate] for field in fields]
+    return np.concatenate([a, b])
+
