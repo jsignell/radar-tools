@@ -3,7 +3,6 @@ import re
 import numpy as np
 import pandas as pd
 import wget
-from lxml.html import parse
 
 def data_download(ID, t_start, t_end, cache='./tmp/'):
     t_start = pd.Timestamp(t_start)
@@ -31,7 +30,11 @@ def get_catalog_url(ID, t_start):
     return url
 
 def get_AWS_urls(catalog_url, t_start, t_end, **kwargs):
-    page = parse(catalog_url)
+    from urllib2 import urlopen
+    from lxml.html import parse
+
+    page = urlopen(catalog_url)
+    page = parse(page)
     pattern = re.compile("[A-Z]{4}([0-9]{8})_([0-9]{6})*")
 
     data_urls = kwargs.get('data_urls', [])
